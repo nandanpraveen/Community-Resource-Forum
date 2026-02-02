@@ -130,7 +130,7 @@ export default async function Navigation() {
                   {profiles.map((profile) => (
                     <Dropdown.Item key={profile.id} asChild>
                       <Link
-                        className="flex flex-1 items-center gap-3 py-1.5 hover:bg-gray-200 text-2xl text-black pr-9 pl-3"
+                        className="flex flex-1 items-center gap-3 py-1.5 pr-9 pl-3 text-2xl text-black hover:bg-gray-200"
                         href={`/profile/${profile.id}`}
                       >
                         <Avatar {...profile} />
@@ -183,7 +183,7 @@ export default async function Navigation() {
           ) : (
             <form action={signIn} className="contents">
               <button
-                className="flex self-center cursor-default items-center mx-1 gap-1.5 rounded-sm border-b-2 border-sky-900 bg-sky-800 px-3 py-2 text-sm font-medium text-white shadow-sm ring-1 ring-sky-950 transition-colors hover:bg-sky-50 hover:text-sky-800 focus:mt-0.5 focus:border-b-0"
+                className="mx-1 flex cursor-default items-center gap-1.5 self-center rounded-sm border-b-2 border-sky-900 bg-sky-800 px-3 py-2 text-sm font-medium text-white shadow-sm ring-1 ring-sky-950 transition-colors hover:bg-sky-50 hover:text-sky-800 focus:mt-0.5 focus:border-b-0"
                 type="submit"
               >
                 <span className="contents">

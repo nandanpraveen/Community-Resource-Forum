@@ -10,9 +10,7 @@ export const env = createEnv({
     AUTH_ENDPOINT: z.url().default("https://devdogsuga.org/api/auth"),
     AUTH_CLIENT_ID: z.string(),
     AUTH_CLIENT_SECRET: z.string(),
-    AUTH_REDIRECT_URI: z
-      .url()
-      .default("http://localhost:3000/api/auth"),
+    AUTH_REDIRECT_URI: z.url().default("http://localhost:3000/api/auth"),
     MYSQL_USER: (process.env.VERCEL_ENV &&
     process.env.VERCEL_ENV !== "development"
       ? z.string()

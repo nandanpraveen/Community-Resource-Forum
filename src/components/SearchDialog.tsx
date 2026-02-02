@@ -83,11 +83,11 @@ export default function SearchDialog({ tags }: Props) {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 size-full bg-gray-950/20" />
         <Dialog.Content className="fixed top-2/5 left-1/2 z-40 w-[min(calc(100vw-2rem),var(--container-xl))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-md border border-sky-800 bg-white shadow-xl">
-          <div className="flex w-full max-w-xl bg-gray-200 px-4.25 py-3 flex-col gap-2">
-            <Dialog.Title className="text-lg font-bold -mx-px">
+          <div className="flex w-full max-w-xl flex-col gap-2 bg-gray-200 px-4.25 py-3">
+            <Dialog.Title className="-mx-px text-lg font-bold">
               Search Posts
             </Dialog.Title>
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 empty:hidden text-sm/none">
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm/none empty:hidden">
               {selected.length > 0 && <p>Tagged with</p>}
               {selected.map((result) => (
                 <div

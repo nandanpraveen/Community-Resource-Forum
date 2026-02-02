@@ -54,7 +54,8 @@ export const posts = mysqlTable(
       .int()
       .notNull()
       .generatedAlwaysAs(
-        (): SQL => sql`${posts.downvoteIncorrectCount} + ${posts.downvoteHarmfulCount} + ${posts.downvoteSpamCount}`,
+        (): SQL =>
+          sql`${posts.downvoteIncorrectCount} + ${posts.downvoteHarmfulCount} + ${posts.downvoteSpamCount}`,
       ),
     score: d
       .int()
@@ -138,7 +139,8 @@ export const comments = mysqlTable(
       .int()
       .notNull()
       .generatedAlwaysAs(
-        (): SQL => sql`${comments.downvoteIncorrectCount} + ${comments.downvoteHarmfulCount} + ${comments.downvoteSpamCount}`,
+        (): SQL =>
+          sql`${comments.downvoteIncorrectCount} + ${comments.downvoteHarmfulCount} + ${comments.downvoteSpamCount}`,
       ),
     score: d
       .int()

@@ -58,6 +58,6 @@ export async function quarantinePost(formData: FormData) {
   if (result.affectedRows < 1) {
     notFound();
   }
-  
+
   revalidatePath("/moderate/posts", "page");
 }
