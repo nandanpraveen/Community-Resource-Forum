@@ -1,22 +1,24 @@
-import { NextResponse } from "next/server";
-import { db } from "~/server/db";
-import { profiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
-import { getSessionUser } from "~/server/auth";
+import { NextResponse } from "next/server";
+import { getSession } from "~/server/auth";
+import { db } from "~/server/db";
+import { profiles } from "~/server/db/schema/tables";
 
 export async function POST(req: Request) {
-  const session = await getSessionUser({
-    with: {
-      profile: {
-        with: {
-          events: true,
+  const session = await getSession({
+    user: {
+      with: {
+        profile: {
+          with: {
+            events: true,
+          },
         },
-      },
-      organizations: {
-        with: {
-          organization: {
-            with: {
-              events: true,
+        organizationOwnerships: {
+          with: {
+            profile: {
+              with: {
+                events: true,
+              },
             },
           },
         },
@@ -39,11 +41,11 @@ export async function POST(req: Request) {
 
   const profile =
     session &&
-    (id === session.userId
+    (id === session.userProfileId
       ? session.user.profile
-      : session.user.organizations.find(
-          (org) => org.organizationId === id && org.role !== "member",
-        )?.organization);
+      : session.user.organizationOwnerships.find(
+          (org) => org.organizationProfileId === id,
+        )?.profile.events);
 
   if (!profile || !id || typeof id !== "string") {
     return NextResponse.json({ error: "Invalid profile id" }, { status: 400 });

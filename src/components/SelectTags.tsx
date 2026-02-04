@@ -9,7 +9,7 @@ import {
 } from "@headlessui/react";
 import { useCallback, useId, useMemo, useState } from "react";
 import { PiHash, PiMagnifyingGlass, PiTagBold, PiXBold } from "react-icons/pi";
-import type { tags as tagsTable } from "~/server/db/schema";
+import type { tags as tagsTable } from "~/server/db/schema/tables";
 
 type Tag = (typeof tagsTable)["$inferSelect"];
 

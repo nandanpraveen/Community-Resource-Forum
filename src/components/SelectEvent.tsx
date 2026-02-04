@@ -16,7 +16,7 @@ import {
   PiMagnifyingGlass,
 } from "react-icons/pi";
 import formatEventTime from "~/lib/formatEventTime";
-import type { events } from "~/server/db/schema";
+import type { events } from "~/server/db/schema/tables";
 
 type Event = (typeof events)["$inferSelect"];
 

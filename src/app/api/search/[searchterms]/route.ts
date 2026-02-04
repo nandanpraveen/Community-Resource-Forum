@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "../../../../server/db";
-import { posts } from "../../../../server/db/schema";
+import { posts } from "../../../../server/db/schema/tables";
 import { sql } from "drizzle-orm";
 
 export async function GET(

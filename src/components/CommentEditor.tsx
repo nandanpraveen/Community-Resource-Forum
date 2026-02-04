@@ -20,7 +20,7 @@ import { PiCircleNotchBold, PiTextAa, PiTextAaBold } from "react-icons/pi";
 import type { EmitterSource, default as RQ } from "react-quill-new";
 import comment from "~/server/actions/comment";
 import signIn from "~/server/actions/signIn";
-import type { profiles } from "~/server/db/schema";
+import type { profiles } from "~/server/db/schema/tables";
 import SelectProfile from "./SelectProfile";
 
 const ReactQuill = dynamic(

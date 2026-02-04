@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "../db";
-import { sessions } from "../db/schema";
+import { sessions } from "../db/schema/tables";
 
 export default async function signOut() {
   const jar = await cookies();

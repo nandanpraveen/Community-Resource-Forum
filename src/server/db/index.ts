@@ -1,9 +1,10 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import { createPool, type Pool } from "mysql2/promise";
 import { env } from "~/env";
-import * as schema from "./schema";
+import * as schema from "./schema/tables";
 import tags from "./tags.json";
 import { sql } from "drizzle-orm";
+import { relations } from "./schema";
 
 interface Tree {
   [key: string]: Tree;
@@ -37,11 +38,11 @@ function buildNestedSet(tags: Tree, offset = 0, depth = 0): NestedSetItem[] {
 
 async function getDB() {
   const globalForDb = globalThis as unknown as {
-    conn: Pool | undefined;
+    pool: Pool | undefined;
   };
 
-  const conn =
-    globalForDb.conn ??
+  const client =
+    globalForDb.pool ??
     createPool({
       host: env.MYSQL_HOST,
       user: env.MYSQL_USER,
@@ -50,13 +51,13 @@ async function getDB() {
       database: env.MYSQL_DATABASE,
     });
 
-  const db = drizzle(conn, { schema, mode: "default" });
+  const db = drizzle({ client, schema, relations, mode: "default" });
 
   if (env.NODE_ENV === "production") {
     return db;
   }
 
-  if (!globalForDb.conn) {
+  if (!globalForDb.pool) {
     await db
       .insert(schema.tags)
       .values(buildNestedSet(tags))
@@ -74,7 +75,7 @@ async function getDB() {
       });
   }
 
-  globalForDb.conn = conn;
+  globalForDb.pool = client;
   return db;
 }
 

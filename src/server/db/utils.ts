@@ -9,7 +9,7 @@ import {
   type SQLWrapper,
 } from "drizzle-orm";
 
-type AnyTextColumn = Column<ColumnBaseConfig<"string", string>>;
+type AnyTextColumn = Column<ColumnBaseConfig<"string">>;
 type AgainstSearchModifier =
   | "natural"
   | "boolean"

@@ -1,6 +1,6 @@
-import { getSessionUser } from "~/server/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { expectSession } from "~/server/auth";
 
 //This is the form field page where users are redirected to to edit their profiles.
 
@@ -9,19 +9,17 @@ export default async function EditProfilePage({
 }: {
   params: Promise<{ profileId: string }>;
 }) {
-  const session = await getSessionUser({
-    with: {
-      profile: {
-        with: {
-          events: true,
+  const session = await expectSession({
+    user: {
+      with: {
+        profile: {
+          with: {
+            events: true,
+          },
         },
-      },
-      organizations: {
-        with: {
-          organization: {
-            with: {
-              events: true,
-            },
+        organizationOwnerships: {
+          with: {
+            profile: true,
           },
         },
       },
@@ -31,11 +29,11 @@ export default async function EditProfilePage({
 
   const profile =
     session &&
-    (profileId === session.userId
+    (profileId === session.userProfileId
       ? session.user.profile
-      : session.user.organizations.find(
-          (org) => org.organizationId === profileId && org.role !== "member",
-        )?.organization);
+      : session.user.organizationOwnerships.find(
+          (org) => org.organizationProfileId === profileId,
+        )?.profile);
 
   if (!profile) {
     notFound();

@@ -1,9 +1,7 @@
-import { eq } from "drizzle-orm";
 import { db } from "~/server/db";
-import { posts as postsTable } from "~/server/db/schema";
 
-import Post from "~/components/Post";
 import * as z from "zod";
+import Post from "~/components/Post";
 
 const searchParamsSchema = z.object({
   page: z.coerce.number().pipe(z.int().min(0)).default(0),
@@ -19,10 +17,13 @@ export default async function QuarantinedPosts({
     }));
 
   const posts = await db.query.posts.findMany({
-    where: eq(postsTable.quarantined, true),
+    where: {
+      quarantined: true,
+    },
     with: {
       author: true,
       event: true,
+      tags: true,
     },
     offset: params.page * 20,
     limit: 20,
@@ -42,15 +43,15 @@ export default async function QuarantinedPosts({
     <div className="mx-auto flex h-screen w-full max-w-xl flex-col gap-6 px-6 py-6">
       {posts.map((post) => (
         <div
-          className="rounded-md border border-gray-300 text-sm"
+          className="overflow-hidden rounded-md border border-gray-300 text-sm"
           key={post.id}
         >
           <Post
             post={post}
-            profile={post.author}
-            event={post.event!}
+            author={post.author}
+            event={post.event}
+            tags={post.tags}
             vote={null}
-            session={null}
             readonly
           />
 

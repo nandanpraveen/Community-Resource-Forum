@@ -8,9 +8,13 @@ import PostEditor from "~/components/PostEditor";
 import SelectEvent from "~/components/SelectEvent";
 import SelectProfile from "~/components/SelectProfile";
 import SelectTags from "~/components/SelectTags";
-import { expectSessionUser } from "~/server/auth";
+import { authenticate, expectSession } from "~/server/auth";
 import { db } from "~/server/db";
-import { posts, tags as tagsTable, tagsToPosts } from "~/server/db/schema";
+import {
+  posts,
+  tags as tagsTable,
+  tagsToPosts,
+} from "~/server/db/schema/tables";
 
 const schema = zfd.formData({
   authorId: zfd.text(),
@@ -37,18 +41,20 @@ const schema = zfd.formData({
 export default async function CreatePost() {
   const tags = await db.select().from(tagsTable).orderBy(asc(tagsTable.lft));
 
-  const session = await expectSessionUser({
-    with: {
-      profile: {
-        with: {
-          events: true,
+  const session = await expectSession({
+    user: {
+      with: {
+        profile: {
+          with: {
+            events: true,
+          },
         },
-      },
-      organizations: {
-        with: {
-          organization: {
-            with: {
-              events: true,
+        organizationOfficerships: {
+          with: {
+            profile: {
+              with: {
+                events: true,
+              },
             },
           },
         },
@@ -68,12 +74,12 @@ export default async function CreatePost() {
     } = await schema.parseAsync(data);
 
     if (
-      authorId !== session.userId &&
-      !session.user.organizations.some(
-        (org) => org.organizationId === authorId && org.role !== "member",
+      authorId !== session.userProfileId &&
+      !session.user.organizationOfficerships.some(
+        (org) => org.organizationProfileId === authorId,
       )
     ) {
-      redirect("/sign-in");
+      authenticate();
     }
 
     await db.transaction(async (tx) => {
@@ -105,9 +111,9 @@ export default async function CreatePost() {
     redirect("/");
   }
 
-  const organizationProfiles = session.user.organizations
-    .filter((rel) => rel.role === "officer" || rel.role === "owner")
-    .map((rel) => rel.organization);
+  const organizationProfiles = session.user.organizationOfficerships.map(
+    (org) => org.profile,
+  );
 
   const events = [session.user.profile, ...organizationProfiles].flatMap(
     (p) => p.events,

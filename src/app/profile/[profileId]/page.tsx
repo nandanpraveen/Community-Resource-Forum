@@ -1,9 +1,10 @@
+import { desc, eq } from "drizzle-orm";
+import Image from "next/image";
 import Link from "next/link";
-import { db } from "~/server/db";
-import { profiles, posts } from "~/server/db/schema";
-import { eq, desc } from "drizzle-orm";
-import { getSessionUser } from "~/server/auth";
 import { notFound } from "next/navigation";
+import { getSession } from "~/server/auth";
+import { db } from "~/server/db";
+import { posts, profiles } from "~/server/db/schema/tables";
 
 //This view is only visibile to each user for their own profile, as it contains the special "edit" button that actually
 //allows them to edit their own
@@ -13,19 +14,17 @@ export default async function ProfilePage({
 }: {
   params: Promise<{ profileId: string }>;
 }) {
-  const session = await getSessionUser({
-    with: {
-      profile: {
-        with: {
-          events: true,
+  const session = await getSession({
+    user: {
+      with: {
+        profile: {
+          with: {
+            events: true,
+          },
         },
-      },
-      organizations: {
-        with: {
-          organization: {
-            with: {
-              events: true,
-            },
+        organizationOwnerships: {
+          with: {
+            profile: true,
           },
         },
       },
@@ -35,9 +34,9 @@ export default async function ProfilePage({
 
   const isSignedIn =
     session &&
-    (profileId === session.userId ||
-      session.user.organizations.some(
-        (org) => org.organizationId === profileId && org.role !== "member",
+    (profileId === session.userProfileId ||
+      session.user.organizationOwnerships.some(
+        (org) => org.organizationProfileId === profileId,
       ));
 
   const [profile] = await db
@@ -62,9 +61,9 @@ export default async function ProfilePage({
         <div className="md:col-span-1">
           <div className="rounded-2xl bg-white p-6 shadow-sm">
             {profile.image ? (
-              <img
-                src={profile.image}
+              <Image
                 alt={profile.name}
+                src={profile.image}
                 className="mb-4 h-28 w-28 rounded-full object-cover"
               />
             ) : (

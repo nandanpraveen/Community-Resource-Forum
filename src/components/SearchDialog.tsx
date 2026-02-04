@@ -1,73 +1,47 @@
 "use client";
 
-import {
-  Combobox,
-  ComboboxButton,
-  ComboboxInput,
-  ComboboxOption,
-  ComboboxOptions,
-} from "@headlessui/react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useRouter } from "next/navigation";
-import { useCallback, useId, useRef, useState } from "react";
+import React, { useCallback, useId, useState } from "react";
 import { PiHash, PiMagnifyingGlassBold, PiXBold } from "react-icons/pi";
-import useDocumentEvent from "~/lib/useDocumentEvent";
+import * as Combobox from "~/components/Combobox";
+import useKeydown from "~/lib/useKeydown";
 import useTagSelector from "~/lib/useTagSelector";
-import type { tags as tagsTable } from "~/server/db/schema";
-
-type Tag = typeof tagsTable.$inferSelect;
-type ComboboxValue =
-  | {
-      value: ReturnType<typeof useTagSelector>["queried"][number];
-      action: "selectTag";
-    }
-  | { action: "submitQuery" }
-  | null
-  | undefined;
+import type { tags as tagsTable } from "~/server/db/schema/tables";
 
 interface Props {
-  tags: Tag[];
+  tags: (typeof tagsTable.$inferSelect)[];
 }
 
 export default function SearchDialog({ tags }: Props) {
   const [isOpen, setIsOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const id = useId();
 
   const { query, setQuery, queried, selected, reset } = useTagSelector(tags);
 
-  const handleChange = useCallback(
-    (result: ComboboxValue) => {
-      if (!result) {
-        return;
-      }
+  const submitQuery = useCallback(() => {
+    router.push(
+      "/posts?" +
+        new URLSearchParams([
+          ["q", query],
+          ...selected.map((result) => ["t", result.tag.id]),
+        ]).toString(),
+    );
+    setIsOpen(false);
+    reset();
+    return;
+  }, [router, selected, reset, query]);
 
-      if (result.action === "submitQuery") {
-        router.push(
-          "/posts?" +
-            new URLSearchParams([
-              ["q", query],
-              ...selected.map((result) => ["t", result.tag.id]),
-            ]).toString(),
-        );
-        setIsOpen(false);
-        reset();
-        return;
-      }
+  const handleBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.focus();
+  }, []);
 
-      result.value.select();
-    },
-    [router, query, selected, reset],
-  );
-
-  useDocumentEvent(
-    "keydown",
-    (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === "k") {
-        e.preventDefault();
-        setIsOpen((o) => !o);
-      }
+  useKeydown(
+    { ctrlKey: true, key: "k" },
+    (e) => {
+      e.preventDefault();
+      setIsOpen((o) => !o);
     },
     [],
   );
@@ -102,7 +76,6 @@ export default function SearchDialog({ tags }: Props) {
                     className="bg-sky-800 px-1.5 py-0.5 text-white transition-colors hover:bg-sky-700"
                     onClick={() => {
                       result.deselect();
-                      inputRef.current?.focus();
                     }}
                   >
                     <PiXBold />
@@ -112,79 +85,64 @@ export default function SearchDialog({ tags }: Props) {
             </div>
           </div>
 
-          <Combobox
-            immediate
-            onChange={handleChange}
-            onClose={() => setQuery("")}
-          >
-            <div className="relative">
-              <div className="relative border-b border-sky-800">
-                <ComboboxInput
-                  className="w-full bg-white px-10 py-3 font-medium focus:outline-0"
-                  id={id}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Find..."
-                  ref={inputRef}
-                />
+          <div className="relative">
+            <label className="relative flex items-center gap-3 border-b border-sky-800 px-3">
+              <PiMagnifyingGlassBold className="size-4 fill-gray-400" />
 
-                <ComboboxButton className="absolute inset-y-0 left-0 px-3">
-                  <PiMagnifyingGlassBold className="size-4 fill-gray-400" />
-                </ComboboxButton>
+              <input
+                className="w-full bg-white py-3 font-medium focus:outline-0"
+                id={id}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Find..."
+                onBlur={handleBlur}
+              />
 
-                <p className="absolute top-3.75 right-3 rounded-sm border-b-2 border-gray-300 bg-gray-50 px-1 py-px text-[0.66rem] text-gray-600 ring ring-gray-400">
-                  Esc
-                </p>
-              </div>
+              <span className="top-3.75 right-3 rounded-sm border-b-2 border-gray-300 bg-gray-50 px-1 py-px text-[0.66rem] text-gray-600 ring ring-gray-400">
+                Esc
+              </span>
+            </label>
 
-              <ComboboxOptions
-                portal={false}
-                transition
-                className="z-60 w-full rounded-sm p-1 transition duration-100 ease-in [--anchor-gap:--spacing(1)] empty:invisible data-leave:data-closed:opacity-0"
-              >
-                {query.length > 0 && (
-                  <ComboboxOption
-                    className="group flex cursor-default items-center gap-1.5 rounded-sm px-3 py-1.5 text-sm text-gray-700 select-none data-focus:bg-gray-200"
-                    value={{ action: "submitQuery" } satisfies ComboboxValue}
-                  >
-                    Find posts containing
-                    <span className="font-medium text-black before:font-normal before:text-gray-700 before:content-['\201C'] after:font-normal after:text-gray-700 after:content-['\201D']">
-                      {query}
+            <Combobox.Options className="z-60 w-full rounded-sm p-1 transition duration-100 ease-in [--anchor-gap:--spacing(1)] empty:invisible data-leave:data-closed:opacity-0">
+              {query.length > 0 && (
+                <Combobox.Option
+                  className="group flex w-full cursor-default items-center gap-1.5 rounded-sm px-3 py-1.5 text-sm text-gray-700 select-none data-focus:bg-gray-200"
+                  onClick={submitQuery}
+                >
+                  Find posts containing
+                  <span className="font-medium text-black before:font-normal before:text-gray-700 before:content-['\201C'] after:font-normal after:text-gray-700 after:content-['\201D']">
+                    {query}
+                  </span>
+                </Combobox.Option>
+              )}
+
+              <span className="mx-auto my-1 block h-px w-[calc(100%-var(--spacing)*6)] rounded-full bg-gray-400 first:hidden last:hidden" />
+
+              {queried.map((result) => (
+                <Combobox.Option
+                  key={result.tag.id}
+                  className="group flex w-full cursor-default items-center gap-1.5 rounded-sm px-3 py-1 select-none data-focus:bg-gray-200"
+                  onClick={() => result.select()}
+                >
+                  {result.tag.depth === 0 ? (
+                    <PiHash className="size-[1em] text-gray-500" />
+                  ) : (
+                    <span
+                      className="ml-[calc(var(--spacing)*(var(--depth)*7.5))] block size-4 pr-0.5 pb-1.5"
+                      style={
+                        {
+                          "--depth": result.tag.depth,
+                        } as React.CSSProperties
+                      }
+                    >
+                      <span className="block size-full rounded-bl-sm border-b-2 border-l-2 border-gray-400" />
                     </span>
-                  </ComboboxOption>
-                )}
-                <span className="mx-auto my-1 block h-px w-[calc(100%-var(--spacing)*6)] rounded-full bg-gray-400 first:hidden last:hidden" />
-                {queried.map((result) => (
-                  <ComboboxOption
-                    key={result.tag.id}
-                    value={
-                      {
-                        value: result,
-                        action: "selectTag",
-                      } satisfies ComboboxValue
-                    }
-                    className="group flex cursor-default items-center gap-1.5 rounded-sm px-3 py-1 select-none data-focus:bg-gray-200"
-                  >
-                    {result.tag.depth === 0 ? (
-                      <PiHash className="size-[1em] text-gray-500" />
-                    ) : (
-                      <span
-                        className="ml-[calc(var(--spacing)*(var(--depth)*7.5))] block size-4 pr-0.5 pb-1.5"
-                        style={
-                          {
-                            "--depth": result.tag.depth,
-                          } as React.CSSProperties
-                        }
-                      >
-                        <span className="block size-full rounded-bl-sm border-b-2 border-l-2 border-gray-400" />
-                      </span>
-                    )}
+                  )}
 
-                    <div className="text-sm/6">{result.tag.name}</div>
-                  </ComboboxOption>
-                ))}
-              </ComboboxOptions>
-            </div>
-          </Combobox>
+                  <div className="text-sm/6">{result.tag.name}</div>
+                </Combobox.Option>
+              ))}
+            </Combobox.Options>
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

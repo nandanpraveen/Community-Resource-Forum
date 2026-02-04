@@ -1,21 +1,8 @@
-import { formatDistanceToNowStrict, getDate } from "date-fns";
 import { and, between, desc, eq, or, sum } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
-import Link from "next/link";
-import {
-  PiCalendarBlank,
-  PiChatCircleTextBold,
-  PiHash,
-  PiShareFatBold,
-  PiXBold,
-} from "react-icons/pi";
-import Avatar from "~/components/Avatar";
-import FlagButton from "~/components/FlagButton";
-import { SearchBar } from "~/components/SearchBar";
-import ShareDropdown from "~/components/ShareDropdown";
-import VoteButton from "~/components/VoteButton";
-import formatEventTime from "~/lib/formatEventTime";
-import { getSessionUser } from "~/server/auth";
+import { PiXBold } from "react-icons/pi";
+import Post from "~/components/Post";
+import { getSession } from "~/server/auth";
 import { db } from "~/server/db";
 import {
   events,
@@ -24,13 +11,13 @@ import {
   profiles,
   tags,
   tagsToPosts,
-} from "~/server/db/schema";
+} from "~/server/db/schema/tables";
 
 interface PostRelation {
   post: typeof posts.$inferSelect;
   author: typeof profiles.$inferSelect;
   event: typeof events.$inferSelect | null;
-  vote: typeof postVotes.$inferSelect.value | null;
+  vote: typeof postVotes.$inferSelect | null;
   tags: Map<string, typeof tags.$inferSelect>;
 }
 
@@ -39,7 +26,7 @@ export default async function HomePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const session = await getSessionUser();
+  const session = await getSession({});
   const tagParam = await searchParams.then((s) => {
     if ("t" in s && s.t !== undefined) {
       return s.t instanceof Array ? s.t : [s.t];
@@ -64,7 +51,7 @@ export default async function HomePage({
       post: posts,
       author: profiles,
       event: events,
-      vote: postVotes.value,
+      vote: postVotes,
       tag: tags,
     })
     .from(posts)
@@ -89,7 +76,7 @@ export default async function HomePage({
     .leftJoin(
       postVotes,
       and(
-        eq(postVotes.userId, session?.userId ?? ""),
+        eq(postVotes.userProfileId, session?.userProfileId ?? ""),
         eq(postVotes.postId, posts.id),
       ),
     )
@@ -113,6 +100,23 @@ export default async function HomePage({
       }, new Map<string, PostRelation>()),
     );
 
+  // const posts = await db.query.posts.findMany({
+  //   limit: 20,
+  //   where: {
+  //     quarantined: false,
+  //   },
+  //   with: {
+  //     author: true,
+  //     tags: true,
+  //     event: true,
+  //     votes: {
+  //       where: {
+  //         userId: session?.userProfileId,
+  //       },
+  //     },
+  //   },
+  // });
+
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-6 py-8">
       {tagsResult.length > 0 && (
@@ -134,114 +138,18 @@ export default async function HomePage({
 
       {Array.from(postsResult.values()).map(
         ({ post, author, event, vote, tags }) => (
-          <article
+          <div
+            className="overflow-hidden rounded-md border border-gray-300"
             key={post.id}
-            className="rounded-md border border-gray-300 bg-white px-2"
           >
-            <div className="flex flex-col gap-2 px-2 py-4">
-              <div className="flex items-start gap-3">
-                <Link
-                  href={`/profile/${author.id}`}
-                  className="group flex flex-1 items-center gap-3 text-3xl"
-                >
-                  <Avatar {...author} />
-                  <span className="flex flex-col gap-0.5">
-                    <span className="text-sm leading-none font-bold group-hover:underline">
-                      {author.name}
-                    </span>
-                    <span className="text-xs leading-none text-gray-600 capitalize">
-                      {author.type}
-                    </span>
-                  </span>
-                </Link>
-              </div>
-
-              {post.content && (
-                <div
-                  className="prose prose-sm"
-                  dangerouslySetInnerHTML={{ __html: post.content }}
-                />
-              )}
-
-              {event && (
-                <Link
-                  className="mt-3 flex flex-1 items-center gap-3 rounded-sm border border-gray-300 bg-gray-50 px-2 py-1.5 text-xl text-black shadow-xs"
-                  href={`/event/${post.eventId}`}
-                >
-                  <span className="relative">
-                    <PiCalendarBlank />
-                    <span className="absolute inset-0 top-1/2 w-full -translate-y-1/2 pt-px text-center text-[0.55rem] font-bold">
-                      {getDate(event.start)}
-                    </span>
-                  </span>
-
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="-mt-0.5 overflow-x-hidden text-sm/[1.25] overflow-ellipsis">
-                      {event.title}
-                    </span>
-                    <span className="text-[0.6rem]/[1] font-bold text-gray-600">
-                      {formatEventTime(event)}
-                    </span>
-                  </span>
-
-                  <button className="rounded-xs px-2 py-0.5 text-xs font-bold text-sky-800 uppercase ring-sky-800/50 hover:bg-sky-100 hover:ring">
-                    RSVP
-                  </button>
-                </Link>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center justify-start gap-y-1 pb-2 text-xs">
-              {Array.from(tags.values()).map((tag) => (
-                <Link
-                  key={tag.id}
-                  className="line-clamp-1 flex items-center justify-center gap-0.5 px-2 py-0.5 text-nowrap overflow-ellipsis text-sky-900/70 hover:bg-sky-50 hover:text-sky-900 hover:shadow-xs"
-                  href={{
-                    query: {
-                      t: tagParam.includes(tag.id)
-                        ? tagParam
-                        : [tag.id, ...tagParam],
-                    },
-                  }}
-                >
-                  <PiHash />
-                  {tag.name}
-                </Link>
-              ))}
-              <p className="ml-auto block px-2 text-nowrap text-gray-500">
-                {formatDistanceToNowStrict(post.createdAt)} ago
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 border-t border-t-gray-300 py-3 pr-2 pl-1 text-gray-700">
-              <Link
-                className="flex items-center gap-2 rounded-full px-2 py-1 leading-none hover:bg-sky-100 hover:ring hover:ring-sky-800"
-                href={`/discussion/${post.id}?comment`}
-              >
-                <PiChatCircleTextBold />
-                <span className="text-xs font-semibold">
-                  {post.commentCount}
-                </span>
-              </Link>
-
-              <ShareDropdown
-                permalink={`https://community-resource-forum.vercel.app/discussion/${post.id}`}
-              >
-                <button className="flex items-center gap-2 rounded-full px-2 py-1 leading-none hover:bg-sky-100 hover:ring hover:ring-sky-800">
-                  <PiShareFatBold />
-                  <span className="text-xs font-semibold">Share</span>
-                </button>
-              </ShareDropdown>
-
-              <div className="ml-auto text-xs">
-                <VoteButton
-                  target={{ postId: post.id }}
-                  score={post.score}
-                  value={vote}
-                />
-              </div>
-            </div>
-          </article>
+            <Post
+              post={post}
+              author={author}
+              event={event}
+              vote={vote}
+              tags={Array.from(tags.values())}
+            />
+          </div>
         ),
       )}
       {postsResult.size === 0 && (

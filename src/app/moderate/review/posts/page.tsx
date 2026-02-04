@@ -1,10 +1,9 @@
-import { and, gt, not } from "drizzle-orm";
 import { db } from "~/server/db";
-import { posts as postsTable } from "~/server/db/schema";
+import { type posts as postsTable } from "~/server/db/schema/tables";
 
-import Post from "~/components/Post";
 import { PiChecksBold, PiTrashBold } from "react-icons/pi";
 import * as z from "zod";
+import Post from "~/components/Post";
 import { quarantinePost, resetDownvotes } from "~/server/actions/moderate";
 
 interface DecisionFormProps {
@@ -38,12 +37,12 @@ function DecisionForm({ post }: DecisionFormProps) {
     <form className="contents">
       <input className="hidden" type="hidden" name="postId" value={post.id} />
       <input className="hidden" type="hidden" name="voteKey" value={voteKey} />
-      <p className="bg-gray-200 py-4 text-center">
+      <p className="border-x border-gray-300 bg-gray-200 py-4 text-center">
         <span className="inline-block font-bold">{voteCount} users</span>{" "}
         downvoted this post for containing{" "}
         <span className="block font-bold">{description}</span>
       </p>
-      <div className="-mx-px -mb-px grid grid-cols-2">
+      <div className="grid grid-cols-2">
         <button
           className="flex items-center justify-center gap-2 rounded-bl-md bg-green-200 py-2.5 text-green-950 inset-ring-1 inset-ring-green-900 transition-shadow hover:inset-ring-3"
           formAction={resetDownvotes}
@@ -75,11 +74,21 @@ export default async function FlaggedPage({
     }));
 
   const posts = await db.query.posts.findMany({
-    where: and(gt(postsTable.downvoteCount, 0), not(postsTable.quarantined)),
-    orderBy: postsTable.downvoteCount,
+    where: {
+      AND: [
+        {
+          downvoteCount: { gt: 0 },
+        },
+        { quarantined: false },
+      ],
+    },
+    orderBy: {
+      downvoteCount: "desc",
+    },
     with: {
       author: true,
       event: true,
+      tags: true,
     },
     offset: params.page * 20,
     limit: 20,
@@ -98,18 +107,17 @@ export default async function FlaggedPage({
   return (
     <div className="mx-auto flex h-screen w-full max-w-xl flex-col gap-6 px-6 py-6">
       {posts.map((post) => (
-        <div
-          className="rounded-md border border-gray-300 text-sm"
-          key={post.id}
-        >
-          <Post
-            post={post}
-            profile={post.author}
-            event={post.event!}
-            vote={null}
-            session={null}
-            readonly
-          />
+        <div className="rounded-md text-sm" key={post.id}>
+          <div className="overflow-hidden rounded-t-md border border-b-0 border-gray-300">
+            <Post
+              post={post}
+              author={post.author}
+              event={post.event}
+              tags={post.tags}
+              vote={null}
+              readonly
+            />
+          </div>
 
           <DecisionForm post={post} />
         </div>

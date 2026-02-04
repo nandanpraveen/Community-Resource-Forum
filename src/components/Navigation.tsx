@@ -11,26 +11,27 @@ import {
   PiSignInBold,
   PiSignOut,
   PiSquaresFourDuotone,
-  PiUser,
   PiXBold,
 } from "react-icons/pi";
 import devdog from "~/assets/devdog.png";
 import signIn from "~/server/actions/signIn";
 import signOut from "~/server/actions/signOut";
-import { getSessionUser } from "~/server/auth";
+import { getSession } from "~/server/auth";
 import { db } from "~/server/db";
 import Avatar from "./Avatar";
 import NavigationLink from "./NavigationLink";
 import SearchDialog from "./SearchDialog";
 
 export default async function Navigation() {
-  const tags = await db.query.tags.findMany();
-  const session = await getSessionUser({
-    with: {
-      profile: true,
-      organizations: {
-        with: {
-          organization: true,
+  const tags = await db.query.tags.findMany({ orderBy: { lft: "asc" } });
+  const session = await getSession({
+    user: {
+      with: {
+        profile: true,
+        organizationOwnerships: {
+          with: {
+            profile: true,
+          },
         },
       },
     },
@@ -39,9 +40,7 @@ export default async function Navigation() {
   const profiles = session
     ? [
         session.user.profile,
-        ...session.user.organizations
-          .filter((rel) => rel.role === "officer" || rel.role === "owner")
-          .map((rel) => rel.organization),
+        ...session.user.organizationOwnerships.map((org) => org.profile),
       ]
     : null;
 

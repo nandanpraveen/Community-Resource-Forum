@@ -6,9 +6,9 @@ import { redirect } from "next/navigation";
 import { QuillDeltaToHtmlConverter } from "quill-delta-to-html";
 import * as z from "zod";
 import * as zfd from "zod-form-data";
-import { getSessionUser } from "../auth";
+import { getSession } from "../auth";
 import { db } from "../db";
-import { comments, posts } from "../db/schema";
+import { comments, posts } from "../db/schema/tables";
 import { increment } from "../db/utils";
 
 const schema = zfd.formData({
@@ -37,12 +37,14 @@ export default async function comment(_prevState: unknown, formData: FormData) {
     const { content, authorId, postId, parentId } =
       await schema.parseAsync(formData);
 
-    const session = await getSessionUser({
-      with: {
-        profile: true,
-        organizations: {
-          with: {
-            organization: true,
+    const session = await getSession({
+      user: {
+        with: {
+          profile: true,
+          organizationOfficerships: {
+            with: {
+              profile: true,
+            },
           },
         },
       },
@@ -50,9 +52,9 @@ export default async function comment(_prevState: unknown, formData: FormData) {
 
     if (
       !session ||
-      (authorId !== session.userId &&
-        !session.user.organizations.some(
-          (org) => org.organizationId === authorId && org.role !== "member",
+      (authorId !== session.userProfileId &&
+        !session.user.organizationOfficerships.some(
+          (org) => org.organizationProfileId === authorId,
         ))
     ) {
       throw new Error("Not signed in.");

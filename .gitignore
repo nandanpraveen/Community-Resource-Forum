@@ -47,4 +47,4 @@ yarn-error.log*
 .idea
 
 # drizzle
-volumes/aws/ddl.sql
+volumes/atlas/ddl.sql

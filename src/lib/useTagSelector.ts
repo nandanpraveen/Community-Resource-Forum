@@ -1,76 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { tags as tagsTable } from "~/server/db/schema";
-
-type Tag = typeof tagsTable.$inferSelect;
-
-interface Tree {
-  tag: Tag;
-  children: Tree[];
-}
-
-const prefixOrdering = (a: Tree, b: Tree) => a.tag.lft - b.tag.lft;
-const postfixOrdering = (a: Tag, b: Tag) => a.rgt - b.rgt;
-
-function retree(tags: Tag[]) {
-  const nodes: Tree[] = tags
-    .toSorted(postfixOrdering)
-    .map((tag) => ({ tag, children: [] }));
-  const tree: Tree[] = [];
-
-  function retreeSubarray(start: number) {
-    const childrenStart = tree.push(nodes[start]!) - 1;
-    let i = start + 1;
-
-    while (i < nodes.length) {
-      if (nodes[i]!.tag.depth > tree[childrenStart]!.tag.depth) {
-        i = retreeSubarray(i);
-        continue;
-      }
-
-      if (nodes[i]!.tag.depth < tree[childrenStart]!.tag.depth) {
-        nodes[i]!.children = tree.splice(
-          childrenStart,
-          tree.length - childrenStart,
-          nodes[i]!,
-        );
-        i++;
-        continue;
-      }
-
-      tree.push(nodes[i]!);
-      i++;
-    }
-
-    return nodes.length;
-  }
-
-  retreeSubarray(0);
-  nodes.sort(prefixOrdering);
-
-  return { tree, nodes };
-}
+import { useCallback, useMemo, useState } from "react";
+import { isAncestor, reduceTags, type Tag } from "./tags";
 
 interface Selected {
   tag: Tag;
   deselect: () => void;
-}
-
-function reduceSelection(tree: Tree[], selected: string[]) {
-  const selection: Tag[] = [];
-
-  for (const node of tree) {
-    if (
-      selected.includes(node.tag.id) ||
-      (node.children.length > 1 &&
-        node.children.every((child) => selected.includes(child.tag.id)))
-    ) {
-      selection.push(node.tag);
-    } else {
-      selection.push(...reduceSelection(node.children, selected));
-    }
-  }
-
-  return selection;
 }
 
 interface Queried {
@@ -79,17 +12,21 @@ interface Queried {
   select: () => void;
 }
 
+/**
+ *
+ * @param tags Sorted by `lft`
+ * @returns
+ */
 export default function useTagSelector(tags: Tag[]) {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
-  const { tree, nodes } = useMemo(() => retree(tags), [tags]);
+  const [selected, setSelected] = useState<Tag[]>([]);
 
-  const deselect = useCallback((id: string) => {
-    setSelected((s) => s.filter((other) => id !== other));
+  const deselect = useCallback((tag: Tag) => {
+    setSelected((s) => s.filter((other) => tag.id !== other.id));
   }, []);
 
-  const select = useCallback((id: string) => {
-    setSelected((s) => [...s, id]);
+  const select = useCallback((tag: Tag) => {
+    setSelected((s) => [...s, tag]);
     setQuery("");
   }, []);
 
@@ -100,52 +37,40 @@ export default function useTagSelector(tags: Tag[]) {
 
   const reducedSelection = useMemo<Selected[]>(
     () =>
-      reduceSelection(tree, selected).map((tag) => ({
+      reduceTags(selected).map((tag) => ({
         tag,
-        deselect: () => deselect(tag.id),
+        deselect: () => deselect(tag),
       })),
-    [tree, selected, deselect],
+    [selected, deselect],
   );
 
   const queried = useMemo(
     () =>
-      nodes.filter(
-        (node) =>
+      tags.filter(
+        (tag) =>
           !reducedSelection.some(
-            (result) =>
-              node.tag.lft <= result.tag.lft && result.tag.rgt <= node.tag.rgt,
-          ) && node.tag.name.toLowerCase().includes(query.toLowerCase()),
+            (result) => result.tag.id === tag.id || isAncestor(result.tag, tag),
+          ) && tag.name.toLowerCase().includes(query.toLowerCase()),
       ),
-    [nodes, query, reducedSelection],
+    [query, reducedSelection, tags],
   );
 
   const visibleTags = useMemo<Queried[]>(
     () =>
-      nodes
-        .filter((node) =>
+      tags
+        .filter((tag) =>
           queried.some(
-            (match) =>
-              node.tag.lft <= match.tag.lft && match.tag.rgt <= node.tag.rgt,
+            (result) => tag.lft <= result.lft && result.rgt <= tag.rgt,
           ),
         )
-        .map((node) => ({
-          tag: node.tag,
-          disabled: selected.includes(node.tag.id),
-          select: () => select(node.tag.id),
+        .map((tag) => ({
+          tag,
+          disabled: selected.includes(tag),
+          select: () => select(tag),
         })),
-    [nodes, queried, select, selected],
+    [queried, select, selected, tags],
   );
 
-  useEffect(() => {
-    console.log(selected);
-  }, [selected]);
-
-  // return {
-  //   query,
-  //   setQuery,
-  //   queried,
-  //   selected: reducedSelected,
-  // } satisfies State;
   return {
     query,
     setQuery,

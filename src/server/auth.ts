@@ -1,11 +1,10 @@
-import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
 import * as z from "zod";
 import { env } from "~/env";
 import { db } from "~/server/db";
-import { profiles, sessions, users } from "~/server/db/schema";
+import { profiles, sessions, users } from "~/server/db/schema/tables";
 
 export function authenticate(): never {
   redirect(
@@ -22,18 +21,12 @@ export function authenticate(): never {
 
 /**
  * Gets the currently signed in user.
- * @param include Specify data to include or exclude for the signed-in user using a Drizzle soft-relation query.
- * @returns `null` if the user is not signed in, or an object with user data if the user is signed in.
+ * @param include Specify data to include or exclude for the session using a Drizzle soft-relation query.
+ * @returns `null` if the user is not signed in, or an object with session data if the user is signed in.
  */
-export async function getSessionUser<
-  T extends Exclude<
-    ((Parameters<typeof db.query.sessions.findFirst>[0] & {})["with"] & {
-      // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-      user: {};
-    })["user"],
-    true
-  >,
->(include?: T) {
+export async function getSession<
+  T extends (Parameters<typeof db.query.sessions.findFirst>[0] & {})["with"],
+>(include: T) {
   const token = (await cookies()).get("session")?.value;
 
   if (!token) {
@@ -41,10 +34,12 @@ export async function getSessionUser<
   }
 
   const session = await db.query.sessions.findFirst({
-    where: eq(sessions.token, token),
-    with: {
-      user: include ?? true,
+    where: {
+      token: {
+        eq: token,
+      },
     },
+    with: include,
   });
 
   return session ?? null;
@@ -52,18 +47,12 @@ export async function getSessionUser<
 
 /**
  * Gets the currently signed in user.
- * @param include Specify data to include or exclude for the signed-in user using a Drizzle soft-relation query.
- * @returns The session data. If there is no session present, the user is redirected to the sign-in page.
+ * @param include Specify data to include or exclude for the session using a Drizzle soft-relation query.
+ * @returns The session data.
  */
-export async function expectSessionUser<
-  T extends Exclude<
-    ((Parameters<typeof db.query.sessions.findFirst>[0] & {})["with"] & {
-      // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-      user: {};
-    })["user"],
-    true
-  >,
->(include?: T) {
+export async function expectSession<
+  T extends (Parameters<typeof db.query.sessions.findFirst>[0] & {})["with"],
+>(include: T) {
   const token = (await cookies()).get("session")?.value;
 
   if (!token) {
@@ -71,10 +60,12 @@ export async function expectSessionUser<
   }
 
   const session = await db.query.sessions.findFirst({
-    where: eq(sessions.token, token),
-    with: {
-      user: include ?? true,
+    where: {
+      token: {
+        eq: token,
+      },
     },
+    with: include,
   });
 
   if (!session) {
@@ -122,39 +113,45 @@ export async function handleOAuthRedirect(request: NextRequest) {
 
   const email = profile.id + "@uga.edu";
 
-  const { id } =
-    (await db.query.users.findFirst({
-      where: eq(users.email, email),
-    })) ??
-    (await db.transaction(async (tx) => {
-      const [insertedProfile] = await tx
-        .insert(profiles)
-        .values({
-          name: profile.name ?? "UGA Student",
-          image: profile.image,
-          type: "user",
-        })
-        .$returningId();
-
-      const id = insertedProfile?.id;
-
-      if (id === undefined) {
-        tx.rollback();
-        throw new Error("🍸 How did we get here?");
-      }
-
-      await tx.insert(users).values({
-        id,
+  const userProfileId = await db.transaction(async (tx) => {
+    const existingUser = await db.query.users.findFirst({
+      where: {
         email,
-      });
+      },
+      columns: {
+        profileId: true,
+      },
+    });
 
-      return { id };
-    }));
+    if (existingUser) {
+      return existingUser.profileId;
+    }
+
+    const [insertedProfile] = await tx
+      .insert(profiles)
+      .values({
+        name: profile.name ?? "UGA Student",
+        image: profile.image,
+        type: "user",
+      })
+      .$returningId();
+
+    if (!insertedProfile) {
+      return tx.rollback();
+    }
+
+    await tx.insert(users).values({
+      profileId: insertedProfile.id,
+      email,
+    });
+
+    return insertedProfile.id;
+  });
 
   const [insertedSession] = await db
     .insert(sessions)
     .values({
-      userId: id,
+      userProfileId,
       userAgent: request.headers.get("user-agent"),
     })
     .$returningId();

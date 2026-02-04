@@ -1,6 +1,5 @@
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
 import { formatDistanceToNowStrict, getDate } from "date-fns";
-import { desc, eq, isNull, sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { PropsWithChildren } from "react";
@@ -23,15 +22,13 @@ import * as CommentEditor from "~/components/CommentEditor";
 import ShareDropdown from "~/components/ShareDropdown";
 import VoteButton from "~/components/VoteButton";
 import formatEventTime from "~/lib/formatEventTime";
-import { getSessionUser } from "~/server/auth";
+import { getSession } from "~/server/auth";
 import { db } from "~/server/db";
-import {
+import type {
   comments,
   commentVotes,
-  posts,
-  postVotes,
-  type profiles,
-} from "~/server/db/schema";
+  profiles,
+} from "~/server/db/schema/tables";
 
 type Profile = (typeof profiles)["$inferSelect"];
 type Comment = (typeof comments)["$inferSelect"];
@@ -122,7 +119,7 @@ function Comment({
             </div>
           </div>
 
-          <div className="px-3 pt-3 has-[[data-active=false]]:hidden">
+          <div className="px-3 pt-3 has-data-[active=false]:hidden">
             <CommentEditor.Slot />
           </div>
         </CommentEditor.Root>
@@ -154,9 +151,9 @@ function Comment({
 }
 
 const sort = {
-  popular: desc(sql`${comments.score} + ${comments.replyCount}`),
-  recent: desc(comments.createdAt),
-};
+  popular: { score: "desc" },
+  recent: { createdAt: "desc" },
+} as const;
 
 const SearchParams = z.promise(
   z.object({
@@ -184,12 +181,14 @@ export default async function Page({
   const { sortBy, comment } = await SearchParams.parseAsync(searchParams);
   const orderBy = sort[sortBy];
 
-  const session = await getSessionUser({
-    with: {
-      profile: true,
-      organizations: {
-        with: {
-          organization: true,
+  const session = await getSession({
+    user: {
+      with: {
+        profile: true,
+        organizationOfficerships: {
+          with: {
+            profile: true,
+          },
         },
       },
     },
@@ -200,55 +199,54 @@ export default async function Page({
   }
 
   const post = await db.query.posts.findFirst({
-    where: eq(posts.id, postId),
+    where: {
+      id: postId,
+    },
     with: {
       author: true,
       event: true,
-      tags: {
-        with: {
-          tag: true,
+      tags: true,
+      votes: {
+        where: {
+          userProfileId: session?.userProfileId,
         },
       },
-      votes: session
-        ? {
-            where: eq(postVotes.userId, session.userId),
-            limit: 1,
-          }
-        : undefined,
       comments: parentId
         ? {
-            where: eq(comments.id, parentId),
+            where: {
+              id: parentId,
+            },
             limit: 1,
             with: {
               author: true,
-              votes: session
-                ? {
-                    where: eq(commentVotes.userId, session.userId),
-                    limit: 1,
-                  }
-                : undefined,
+              votes: {
+                where: {
+                  userProfileId: session?.userProfileId,
+                },
+                limit: 1,
+              },
               replies: {
                 orderBy,
                 limit: 5,
                 with: {
                   author: true,
-                  votes: session
-                    ? {
-                        where: eq(commentVotes.userId, session.userId),
-                        limit: 1,
-                      }
-                    : undefined,
+                  votes: {
+                    where: {
+                      userProfileId: session?.userProfileId,
+                    },
+                    limit: 1,
+                  },
                   replies: {
                     orderBy,
                     limit: 2,
                     with: {
                       author: true,
-                      votes: session
-                        ? {
-                            where: eq(commentVotes.userId, session.userId),
-                            limit: 1,
-                          }
-                        : undefined,
+                      votes: {
+                        where: {
+                          userProfileId: session?.userProfileId,
+                        },
+                        limit: 1,
+                      },
                     },
                   },
                 },
@@ -258,37 +256,41 @@ export default async function Page({
         : {
             orderBy,
             limit: 5,
-            where: isNull(comments.parentId),
+            where: {
+              parentId: {
+                isNull: true,
+              },
+            },
             with: {
               author: true,
-              votes: session
-                ? {
-                    where: eq(commentVotes.userId, session.userId),
-                    limit: 1,
-                  }
-                : undefined,
+              votes: {
+                where: {
+                  userProfileId: session?.userProfileId,
+                },
+                limit: 1,
+              },
               replies: {
                 orderBy,
                 limit: 3,
                 with: {
                   author: true,
-                  votes: session
-                    ? {
-                        where: eq(commentVotes.userId, session.userId),
-                        limit: 1,
-                      }
-                    : undefined,
+                  votes: {
+                    where: {
+                      userProfileId: session?.userProfileId,
+                    },
+                    limit: 1,
+                  },
                   replies: {
                     orderBy,
                     limit: 2,
                     with: {
                       author: true,
-                      votes: session
-                        ? {
-                            where: eq(commentVotes.userId, session.userId),
-                            limit: 1,
-                          }
-                        : undefined,
+                      votes: {
+                        where: {
+                          userProfileId: session?.userProfileId,
+                        },
+                        limit: 1,
+                      },
                     },
                   },
                 },
@@ -305,9 +307,7 @@ export default async function Page({
   const profiles = session
     ? ([
         session.user.profile,
-        ...session.user.organizations
-          .filter((rel) => rel.role === "officer" || rel.role === "owner")
-          .map((rel) => rel.organization),
+        ...session.user.organizationOfficerships.map((org) => org.profile),
       ] as const)
     : undefined;
 
@@ -389,7 +389,7 @@ export default async function Page({
                   </span>
 
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="-mt-0.5 overflow-x-hidden text-sm/[1.25] overflow-ellipsis">
+                    <span className="-mt-0.5 overflow-x-hidden text-sm/1.25 overflow-ellipsis">
                       {post.event.title}
                     </span>
                     <span className="text-[0.6rem]/[1] font-bold text-gray-600">
@@ -405,7 +405,7 @@ export default async function Page({
             </div>
 
             <div className="flex flex-wrap items-center justify-start gap-y-1 pb-2 text-xs">
-              {post.tags.map(({ tag }) => (
+              {post.tags.map((tag) => (
                 <Link
                   key={tag.id}
                   className="line-clamp-1 flex items-center justify-center gap-0.5 px-2 py-0.5 text-nowrap overflow-ellipsis text-sky-900/70 hover:bg-sky-50 hover:text-sky-900 hover:shadow-xs"

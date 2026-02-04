@@ -3,9 +3,9 @@ import { eq } from "drizzle-orm";
 import { notFound, unauthorized } from "next/navigation";
 import * as z from "zod";
 import * as zfd from "zod-form-data";
-import { expectSessionUser } from "../auth";
+import { expectSession } from "../auth";
 import { db } from "../db";
-import { posts } from "../db/schema";
+import { posts } from "../db/schema/tables";
 import { revalidatePath } from "next/cache";
 
 const schema = zfd.formData({
@@ -20,7 +20,7 @@ const keyMap = {
 };
 
 export async function resetDownvotes(formData: FormData) {
-  const session = await expectSessionUser();
+  const session = await expectSession({ user: true });
 
   if (session.user.role !== "moderator") {
     unauthorized();
@@ -43,7 +43,7 @@ export async function resetDownvotes(formData: FormData) {
 }
 
 export async function quarantinePost(formData: FormData) {
-  const session = await expectSessionUser();
+  const session = await expectSession({ user: true });
 
   if (session.user.role !== "moderator") {
     unauthorized();

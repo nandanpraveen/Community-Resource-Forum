@@ -1,5 +1,5 @@
 import { Fallback, Image, Root } from "@radix-ui/react-avatar";
-import type { profiles } from "~/server/db/schema";
+import type { profiles } from "~/server/db/schema/tables";
 
 export default function Avatar(profile: (typeof profiles)["$inferSelect"]) {
   return (

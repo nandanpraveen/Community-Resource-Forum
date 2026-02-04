@@ -12,7 +12,7 @@ import {
   PiTrash,
 } from "react-icons/pi";
 import vote from "~/server/actions/vote";
-import type { postVotes } from "~/server/db/schema";
+import type { postVotes } from "~/server/db/schema/tables";
 
 function valueOf(vote?: typeof postVotes.$inferSelect.value | null) {
   switch (vote) {

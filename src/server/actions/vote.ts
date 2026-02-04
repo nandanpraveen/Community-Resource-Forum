@@ -3,7 +3,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import * as z from "zod";
 import * as zfd from "zod-form-data";
-import { expectSessionUser, getSessionUser } from "../auth";
+import { expectSession } from "../auth";
 import { db } from "../db";
 import {
   comments,
@@ -11,8 +11,7 @@ import {
   posts,
   postVotes,
   type voteValue,
-} from "../db/schema";
-import signIn from "./signIn";
+} from "../db/schema/tables";
 import { increment } from "../db/utils";
 
 export interface PrevState {
@@ -40,7 +39,7 @@ const schema = zfd.formData(
 );
 
 export default async function vote(prevState: PrevState, formData: FormData) {
-  const session = await expectSessionUser();
+  const session = await expectSession({});
   const data = await schema.parseAsync(formData);
 
   const target =
@@ -70,7 +69,7 @@ export default async function vote(prevState: PrevState, formData: FormData) {
       .where(
         and(
           target.votesTableContentIdCondition,
-          eq(target.votesTable.userId, session.userId),
+          eq(target.votesTable.userProfileId, session.userProfileId),
         ),
       )
       .limit(1);
@@ -82,7 +81,7 @@ export default async function vote(prevState: PrevState, formData: FormData) {
         .insert(target.votesTable)
         .values({
           [target.votesTableContentIdColumn]: target.contentId,
-          userId: session.userId,
+          userProfileId: session.userProfileId,
           value: newVote,
         })
         .onDuplicateKeyUpdate({
@@ -96,7 +95,7 @@ export default async function vote(prevState: PrevState, formData: FormData) {
         .where(
           and(
             target.votesTableContentIdCondition,
-            eq(target.votesTable.userId, session.userId),
+            eq(target.votesTable.userProfileId, session.userProfileId),
           ),
         );
     }

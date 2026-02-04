@@ -11,9 +11,9 @@ import * as z from "zod";
 import * as zfd from "zod-form-data";
 import SelectDateTimeRange from "~/components/SelectDateTimeRange";
 import SelectProfile from "~/components/SelectProfile";
-import { expectSessionUser } from "~/server/auth";
+import { authenticate, expectSession } from "~/server/auth";
 import { db } from "~/server/db";
-import { events } from "~/server/db/schema";
+import { events } from "~/server/db/schema/tables";
 
 const schema = zfd.formData(
   z
@@ -45,19 +45,17 @@ const schema = zfd.formData(
 );
 
 export default async function CreateEvent() {
-  const session = await expectSessionUser({
-    with: {
-      profile: {
-        with: {
-          events: true,
+  const session = await expectSession({
+    user: {
+      with: {
+        profile: {
+          with: {
+            events: true,
+          },
         },
-      },
-      organizations: {
-        with: {
-          organization: {
-            with: {
-              events: true,
-            },
+        organizationOfficerships: {
+          with: {
+            profile: true,
           },
         },
       },
@@ -71,12 +69,12 @@ export default async function CreateEvent() {
       await schema.parseAsync(data);
 
     if (
-      organizerId !== session.userId &&
-      !session.user.organizations.some(
-        (org) => org.organizationId === organizerId && org.role !== "member",
+      organizerId !== session.userProfileId &&
+      !session.user.organizationOfficerships.some(
+        (org) => org.organizationProfileId === organizerId,
       )
     ) {
-      redirect("/");
+      authenticate();
     }
 
     const start = !dateTime.allDay
@@ -109,10 +107,6 @@ export default async function CreateEvent() {
     redirect("/create/post");
   }
 
-  const organizationProfiles = session.user.organizations
-    .filter((rel) => rel.role === "officer" || rel.role === "owner")
-    .map((rel) => rel.organization);
-
   return (
     <form
       action={action}
@@ -128,7 +122,12 @@ export default async function CreateEvent() {
         <div className="relative -mx-8 bg-gray-200 px-8 py-4">
           <SelectProfile
             inputName="organizerId"
-            profiles={[session.user.profile, ...organizationProfiles]}
+            profiles={[
+              session.user.profile,
+              ...session.user.organizationOfficerships.map(
+                (org) => org.profile,
+              ),
+            ]}
           />
         </div>
       </div>
