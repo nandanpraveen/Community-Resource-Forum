@@ -1,4 +1,4 @@
-import type { tags as tagsTable } from "~/server/db/schema/tables";
+import { type tags as tagsTable } from "~/server/db/schema/tables";
 
 export type Tag = typeof tagsTable.$inferSelect;
 
