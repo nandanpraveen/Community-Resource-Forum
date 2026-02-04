@@ -26,18 +26,18 @@ jobs:
         if: ${{ github.event_name == 'pull_request_target' }}
         run: |
           SKIP_ENV_VALIDATION=true pnpm turbo build
-          pnpm dlx vercel env pull ${{ env.ENV_CONFIG }} --token=${{ secrets.VERCEL_TOKEN }} .env
-          pnpm dlx dotenv-cli -- sh -c 'atlas schema apply --config file://volumes/atlas/atlas.hcl --env remote --dev-url docker://mysql/8/example --url mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MYSQL_DATABASE --dry-run'
+          SKIP_ENV_VALIDATION=true pnpm dlx vercel env pull ${{ env.ENV_CONFIG }} --token=${{ secrets.VERCEL_TOKEN }} .env
+          SKIP_ENV_VALIDATION=true pnpm dlx dotenv-cli -- sh -c 'atlas schema apply --config file://volumes/atlas/atlas.hcl --env remote --dev-url docker://mysql/8/example --url mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MYSQL_DATABASE --dry-run'
         env:
           ENV_CONFIG: ${{ (env.REF == 'main' && '--environment=production') || format('--environment=preview --git-branch={0}', env.REF) }}
       - name: Deploy Project (for Pushes)
         if: ${{ github.event_name == 'push' }}
         run: |
           pnpm dlx vercel env pull ${{ env.ENV_CONFIG }} --token=${{ secrets.VERCEL_TOKEN }} .env
-          pnpm db:generate
-          pnpm dlx dotenv-cli -- sh -c 'atlas schema apply --config file://volumes/atlas/atlas.hcl --env remote --dev-url docker://mysql/8/example --url mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MYSQL_DATABASE --auto-approve'
-          pnpm dlx dotenv-cli -- pnpm dlx tsx addTagsToDatabase.ts
-          pnpm dlx vercel deploy ${{ env.BUILD_CONFIG }} --token=${{ secrets.VERCEL_TOKEN }}
+          SKIP_ENV_VALIDATION=true pnpm db:generate
+          SKIP_ENV_VALIDATION=true pnpm dlx dotenv-cli -- sh -c 'atlas schema apply --config file://volumes/atlas/atlas.hcl --env remote --dev-url docker://mysql/8/example --url mysql://$MYSQL_USER:$MYSQL_PASSWORD@$MYSQL_HOST:$MYSQL_PORT/$MYSQL_DATABASE --auto-approve'
+          SKIP_ENV_VALIDATION=true pnpm dlx dotenv-cli -- pnpm dlx tsx addTagsToDatabase.ts
+          SKIP_ENV_VALIDATION=true pnpm dlx vercel deploy ${{ env.BUILD_CONFIG }} --token=${{ secrets.VERCEL_TOKEN }}
         env:
           ENV_CONFIG: ${{ (env.REF == 'main' && '--environment=production') || format('--environment=preview --git-branch={0}', env.REF) }}
           BUILD_CONFIG: ${{ (env.REF == 'main' && '--prod') || ' ' }}
